@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lucianumm/Security/blob/main/security-auditor/schemas/state/architecture.schema.json",
+  "title": "Security Auditor discovered architecture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "sourceDigest", "discoveredAt", "stack", "components", "trustBoundaries", "dataFlows", "externalIntegrations"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "project": {"type": "string", "minLength": 1, "maxLength": 200},
+    "sourceDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "discoveredAt": {"type": ["string", "null"], "format": "date-time"},
+    "stack": {"type": "object"},
+    "components": {"type": "array", "items": {"type": "object"}},
+    "trustBoundaries": {"type": "array", "items": {"type": "object"}},
+    "dataFlows": {"type": "array", "items": {"type": "object"}},
+    "externalIntegrations": {"type": "array", "items": {"type": "object"}}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "project": "<configure project>",
+  "sourceDigest": null,
+  "discoveredAt": null,
+  "stack": {},
+  "components": [],
+  "trustBoundaries": [],
+  "dataFlows": [],
+  "externalIntegrations": []
+}

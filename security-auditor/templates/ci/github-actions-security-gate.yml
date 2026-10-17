@@ -1,0 +1,321 @@
+# Starter CI template for a Node.js/npm application. Adapt its runtime, native test commands,
+# selected scanners and paths before copying it to .github/workflows/security-gate.yml.
+# All action references are full commit SHAs; verify and update them through reviewed changes.
+# npm audit and OSV disclose package names/versions to registry/advisory services. Use only where
+# that disclosure is allowed. Raw reports stay in runner temp or workspace and are not uploaded.
+# Gitleaks uses its official digest-pinned image with network disabled and trusted default rules.
+# Semgrep loads rules from the protected default branch. Trivy downloads public databases.
+
+name: Security Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present
+
+  secret-scan:
+    name: Secret scan (working tree and history)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan working tree and history without exposing raw output
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e .gitleaksignore ] || [ -L .gitleaksignore ]; then
+            echo "A repository-controlled .gitleaksignore is not trusted by this gate. Manage reviewed exceptions in protected CI policy."
+            exit 2
+          fi
+          policy_dir=$(mktemp -d "$RUNNER_TEMP/gitleaks-policy.XXXXXX")
+          trap 'rm -rf -- "$policy_dir"' EXIT
+          printf '[extend]\nuseDefault = true\n' > "$policy_dir/gitleaks.toml"
+          : > "$policy_dir/.gitleaksignore"
+          set +e
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 128 --memory 1g --cpus 2 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=256m \
+            -v "$GITHUB_WORKSPACE:/source:ro" -v "$policy_dir:/policy:ro" -w /tmp \
+            ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:b109bc5f8f76a38196a3e413704fc5b9e3c32360bce4e4b603bd6f45b3721dbb \
+            detect --source /source --log-opts=--all --no-banner --redact \
+            --config /policy/gitleaks.toml --gitleaks-ignore-path /policy/.gitleaksignore \
+            --ignore-gitleaks-allow > "$policy_dir/scanner-output.txt" 2>&1
+          result=$?
+          rm -f -- "$policy_dir/scanner-output.txt"
+          if [ "$result" -eq 0 ]; then
+            echo "Gitleaks completed without findings."
+          else
+            echo "Gitleaks found a blocking secret or could not complete; raw output was suppressed."
+          fi
+          exit "$result"
+
+  npm-audit:
+    name: npm dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org/
+      - name: Run npm audit without logging package-level report details
+        shell: bash
+        run: |
+          set +e
+          npm audit --audit-level=high --registry=https://registry.npmjs.org/ > "$RUNNER_TEMP/npm-audit-output.txt" 2>&1
+          result=$?
+          if [ "$result" -eq 0 ]; then echo "npm audit completed without blocking findings."; else echo "npm audit found blocking findings or could not complete; raw output was suppressed."; fi
+          exit "$result"
+
+  osv-scan:
+    name: OSV dependency scan
+    # This reusable workflow queries OSV.dev using package names and versions. Review that
+    # disclosure before enabling it for private repositories or sensitive dependency manifests.
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    with:
+      scan-args: |-
+        --recursive
+        --no-ignore
+        --config=/dev/null
+        ./
+      upload-sarif: false
+      fail-on-vuln: true
+    permissions:
+      contents: read
+
+  sast:
+    name: Local rules SAST
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reserve the trusted-policy checkout path
+        shell: bash
+        run: |
+          if [ -e .trusted-policy ] || [ -L .trusted-policy ]; then
+            echo "Reserved trusted-policy path already exists in the source checkout."
+            exit 2
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted-policy
+          sparse-checkout: security-auditor/catalog/tools/semgrep-rules.yaml
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Prepare protected Semgrep rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .trusted-policy/security-auditor/catalog/tools/semgrep-rules.yaml
+          cp .trusted-policy/security-auditor/catalog/tools/semgrep-rules.yaml "$RUNNER_TEMP/semgrep-rules.yaml"
+          rm -rf -- .trusted-policy
+          if find . -type d -name .git -prune -o -name .semgrepignore -print -quit | grep -q .; then
+            echo "Repository-controlled .semgrepignore files are not trusted by this gate. Review them in protected scanner policy."
+            exit 2
+          fi
+      - name: Run Semgrep with network disabled and output suppressed
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt=no-new-privileges \
+            --pids-limit 256 --memory 4g --cpus 2 --tmpfs /tmp:rw,noexec,nosuid,size=1g \
+            -e HOME=/tmp/home -e XDG_CACHE_HOME=/tmp/cache \
+            -v "$GITHUB_WORKSPACE:/src:ro" -v "$RUNNER_TEMP/semgrep-rules.yaml:/policy/semgrep-rules.yaml:ro" -w /src \
+            returntocorp/semgrep:1.181.0@sha256:81474464c1f07483ba0682a44787fd93c91397419762a04abe2bafaae396304b \
+            scan --config /policy/semgrep-rules.yaml --no-git-ignore --error --severity ERROR --metrics off --quiet . \
+            > "$RUNNER_TEMP/semgrep-output.txt" 2>&1
+          result=$?
+          rm -f -- "$RUNNER_TEMP/semgrep-output.txt" "$RUNNER_TEMP/semgrep-rules.yaml"
+          if [ "$result" -eq 0 ]; then
+            echo "Semgrep completed without blocking findings."
+          elif [ "$result" -eq 1 ]; then
+            echo "Semgrep reported blocking findings; raw output is suppressed to avoid leaking source or secrets."
+          else
+            echo "Semgrep could not complete; raw output is suppressed."
+          fi
+          exit "$result"
+
+  iac-and-container:
+    name: IaC and filesystem configuration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare explicit empty Trivy policy and ignore list
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e .codex-ci-trivyignore ] || [ -L .codex-ci-trivyignore ]; then
+            echo "Reserved Trivy policy path already exists; refusing to trust repository content."
+            exit 2
+          fi
+          printf '{}\n' > "$RUNNER_TEMP/trivy-policy.yaml"
+          : > .codex-ci-trivyignore
+      - name: Trivy configuration scan
+        if: hashFiles('**/Dockerfile', '**/docker-compose*.yml', '**/docker-compose*.yaml', '**/*.tf', '**/*.tf.json', '**/k8s/**/*.yml', '**/k8s/**/*.yaml', '**/charts/**/*.yml', '**/charts/**/*.yaml') != ''
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          format: json
+          output: ${{ runner.temp }}/trivy-config-results.json
+          hide-progress: true
+          trivy-config: ${{ runner.temp }}/trivy-policy.yaml
+          trivyignores: .codex-ci-trivyignore
+          cache: false
+      - name: Trivy filesystem vulnerability and misconfiguration scan
+        if: hashFiles('**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/package.json', '**/requirements*.txt', '**/poetry.lock', '**/uv.lock', '**/go.sum', '**/Cargo.lock', '**/composer.lock', '**/Gemfile.lock', '**/pom.xml', '**/build.gradle*') != ''
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          format: json
+          output: ${{ runner.temp }}/trivy-fs-results.json
+          hide-progress: true
+          trivy-config: ${{ runner.temp }}/trivy-policy.yaml
+          trivyignores: .codex-ci-trivyignore
+          cache: false
+      - name: Remove Trivy reports and temporary policy
+        if: always()
+        shell: bash
+        run: |
+          rm -f -- .codex-ci-trivyignore "$RUNNER_TEMP/trivy-policy.yaml" \
+            "$RUNNER_TEMP/trivy-config-results.json" "$RUNNER_TEMP/trivy-fs-results.json"
+
+  security-regression-tests:
+    name: Security regression tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Adapt this command to the project's real security regression suite; missing tests must fail.
+      - run: npm test -- tests/security
+
+  baseline-comparison:
+    name: Trusted baseline and findings gate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reserve the trusted-policy checkout path
+        shell: bash
+        run: |
+          if [ -e .trusted-policy ] || [ -L .trusted-policy ]; then
+            echo "Reserved trusted-policy path already exists in the source checkout."
+            exit 2
+          fi
+      - name: Check out protected baseline source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted-policy
+          sparse-checkout: |
+            .security/baseline.json
+            .security/risk-register.json
+            security-auditor/scripts/security_auditor.py
+            security-auditor/schemas/state
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Load trusted policy outside the source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .trusted-policy/.security/baseline.json
+          test -s .trusted-policy/.security/risk-register.json
+          cp .trusted-policy/.security/baseline.json "$RUNNER_TEMP/trusted-baseline.json"
+          cp .trusted-policy/.security/risk-register.json "$RUNNER_TEMP/trusted-risk-register.json"
+          mkdir -p "$RUNNER_TEMP/trusted-tool/scripts" "$RUNNER_TEMP/trusted-tool/schemas"
+          cp .trusted-policy/security-auditor/scripts/security_auditor.py "$RUNNER_TEMP/trusted-tool/scripts/"
+          cp -R .trusted-policy/security-auditor/schemas/state "$RUNNER_TEMP/trusted-tool/schemas/"
+          rm -rf -- .trusted-policy
+          test -s "$RUNNER_TEMP/trusted-tool/scripts/security_auditor.py"
+      - name: Evaluate the current report against protected policy
+        run: >-
+          python3 "$RUNNER_TEMP/trusted-tool/scripts/security_auditor.py" gate --root .
+          --trusted-baseline "$RUNNER_TEMP/trusted-baseline.json"
+          --trusted-risk-register "$RUNNER_TEMP/trusted-risk-register.json"
+
+  gate:
+    name: Required security gate result
+    runs-on: ubuntu-24.04
+    needs:
+      - build-and-test
+      - secret-scan
+      - npm-audit
+      - osv-scan
+      - sast
+      - iac-and-container
+      - security-regression-tests
+      - baseline-comparison
+    if: always()
+    steps:
+      - name: Require every configured job to succeed
+        env:
+          BUILD_RESULT: ${{ needs.build-and-test.result }}
+          SECRETS_RESULT: ${{ needs.secret-scan.result }}
+          NPM_RESULT: ${{ needs.npm-audit.result }}
+          OSV_RESULT: ${{ needs.osv-scan.result }}
+          SAST_RESULT: ${{ needs.sast.result }}
+          IAC_RESULT: ${{ needs.iac-and-container.result }}
+          REGRESSION_RESULT: ${{ needs.security-regression-tests.result }}
+          BASELINE_RESULT: ${{ needs.baseline-comparison.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for result in "$BUILD_RESULT" "$SECRETS_RESULT" "$NPM_RESULT" "$OSV_RESULT" \
+                        "$SAST_RESULT" "$IAC_RESULT" "$REGRESSION_RESULT" "$BASELINE_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "result=FAIL" >> "$GITHUB_STEP_SUMMARY"
+              echo "Security gate failed or was inconclusive: a required job did not succeed."
+              exit 1
+            fi
+          done
+          echo "result=PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "All configured security and test jobs succeeded."

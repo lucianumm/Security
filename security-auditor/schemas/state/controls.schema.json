@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lucianumm/Security/blob/main/security-auditor/schemas/state/controls.schema.json",
+  "title": "Security Auditor control evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "sourceDigest", "scope", "controls"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "project": {"type": "string", "minLength": 1, "maxLength": 200},
+    "sourceDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 1000}},
+    "controls": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "status", "evidence"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-zA-Z0-9._:-]{1,128}$"},
+        "status": {"enum": ["IMPLEMENTED", "PARTIALLY_IMPLEMENTED", "NOT_IMPLEMENTED", "MISCONFIGURED", "NOT_APPLICABLE", "NOT_VERIFIED"]},
+        "evidence": {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 2000}},
+        "reason": {"type": "string", "maxLength": 2000},
+        "finding": {"type": ["string", "null"], "pattern": "^SEC-[0-9]{4,8}$"}
+      }
+    }}
+  }
+}

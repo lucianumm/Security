@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "project": "<configure project>",
+  "source": {
+    "sourceDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "policyDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scope": ["."],
+    "generatedAt": "2026-10-17T00:00:00Z",
+    "complete": false
+  },
+  "coverage": {"applicableControls": 1, "verifiedControls": 0},
+  "scanners": [
+    {"tool": "gitleaks", "version": "not-run", "ran": false, "exitCode": null}
+  ],
+  "controls": [
+    {"id": "audit.complete", "status": "NOT_VERIFIED", "evidence": ["Starter state; no audit has run"]}
+  ],
+  "findings": []
+}
