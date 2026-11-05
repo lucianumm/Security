@@ -1,0 +1,47 @@
+name: Relatar um bug
+description: Erro reproduzível no uso, nos auxiliares ou nos contratos da skill.
+title: '[Bug] '
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Para uma vulnerabilidade da própria skill, use o relato privado indicado em SECURITY.md. Remova segredos e use exemplos sintéticos.
+  - type: textarea
+    id: problema
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o comportamento observado e o impacto.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Como reproduzir com segurança
+      description: Informe os passos mínimos, comandos e uma fixture sintética, sem endpoints de terceiros.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+  - type: textarea
+    id: ambiente
+    attributes:
+      label: Ambiente e versão
+      description: Informe o commit ou versão da skill, sistema operacional, agente, Python e Git, quando aplicável.
+    validations:
+      required: true
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências sanitizadas
+      description: Compartilhe apenas trechos necessários e já revisados. Não envie relatórios brutos de segredos.
+  - type: checkboxes
+    id: privacidade
+    attributes:
+      label: Conferência antes do envio
+      options:
+        - label: Revisei o relato e não incluí credenciais, dados pessoais, código privado ou detalhes de vulnerabilidades que exigem divulgação privada.
+          required: true

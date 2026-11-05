@@ -1,0 +1,32 @@
+name: Security Auditor skill tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skill-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-and-schema-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check Python runtime
+        run: python3 --version
+      - name: Run gate and schema regression tests
+        run: python3 -m unittest discover -s security-auditor/tests/unit -v
+      - name: Verify encyclopedia source and catalog integrity
+        run: python3 security-auditor/scripts/build_encyclopedia.py
+      - name: Check POSIX scripts parse
+        run: |
+          sh -n security-auditor/scripts/security-gate.sh
+          sh -n security-auditor/scripts/detect-stack.sh

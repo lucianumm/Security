@@ -1,0 +1,30 @@
+rules:
+  - id: python-dynamic-eval
+    message: Dynamic evaluation needs a validated data-flow review.
+    languages: [python]
+    severity: ERROR
+    pattern: eval($VALUE)
+    metadata:
+      category: security
+      confidence: MEDIUM
+
+  - id: python-subprocess-shell-true
+    message: Shell interpretation of a subprocess argument needs a validated data-flow review.
+    languages: [python]
+    severity: ERROR
+    patterns:
+      - pattern: subprocess.$FUNCTION(..., shell=True, ...)
+    metadata:
+      category: security
+      confidence: MEDIUM
+
+  - id: javascript-dynamic-eval
+    message: Dynamic evaluation needs a validated data-flow review.
+    languages: [javascript, typescript]
+    severity: ERROR
+    pattern-either:
+      - pattern: eval($VALUE)
+      - pattern: new Function(...)
+    metadata:
+      category: security
+      confidence: MEDIUM

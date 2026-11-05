@@ -1,0 +1,31 @@
+name: Propor uma melhoria
+description: Sugestão para uso, verificação, testes, documentação ou fluxo da skill.
+title: '[Melhoria] '
+labels: [enhancement]
+body:
+  - type: textarea
+    id: necessidade
+    attributes:
+      label: Qual problema a proposta resolve?
+      description: Descreva um caso de uso concreto.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Comportamento proposto
+      description: Explique a mudança e como ela respeita o escopo e a autorização do usuário.
+    validations:
+      required: true
+  - type: textarea
+    id: verificacao
+    attributes:
+      label: Como verificar o resultado
+      description: Proponha critérios de aceite e casos positivos, negativos ou de falso positivo.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas, riscos e compatibilidade
+      description: Inclua dependências, dados enviados à rede e impactos em contratos, se houver.

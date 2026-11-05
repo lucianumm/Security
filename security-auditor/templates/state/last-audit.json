@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "project": "<configure project>",
+  "mode": "NOT_RUN",
+  "startedAt": null,
+  "finishedAt": null,
+  "sourceDigest": null,
+  "scope": [],
+  "scanners": [],
+  "score": null,
+  "coverage": null,
+  "readiness": "INSUFFICIENT_EVIDENCE",
+  "counts": null,
+  "gate": {"result": "ERROR", "reasons": ["No audit has run"]}
+}

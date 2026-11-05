@@ -1,0 +1,202 @@
+# Starter pipeline for a Node.js/npm application. Adapt paths, test commands and scanner scope.
+# Images use content digests. npm audit and OSV disclose package names/versions to registry/advisory
+# services; approve that disclosure before enabling this template for private repos or manifests.
+# Use isolated runners and protected CI variables; untrusted merge request code must not receive
+# deployment credentials, registry write access or production tokens.
+
+stages:
+  - build
+  - security
+  - gate
+
+default:
+  interruptible: true
+
+variables:
+  GIT_DEPTH: "0"
+
+.node:
+  image:
+    name: node:24.11.1-alpine3.23@sha256:682368d8253e0c3364b803956085c456a612d738bd635926d73fa24db3ce53d7
+  before_script:
+    - npm ci
+
+build-and-test:
+  extends: .node
+  stage: build
+  script:
+    - npm run lint --if-present
+    - npm run typecheck --if-present
+    - npm test --if-present
+    - npm run build --if-present
+
+secret-scan:
+  stage: security
+  image:
+    name: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+    entrypoint: [""]
+  script:
+    # Use trusted built-in rules, reject source-controlled suppression, and discard raw output.
+    - |
+      set -eu
+      if [ -e .gitleaksignore ] || [ -L .gitleaksignore ]; then
+        echo "A repository-controlled .gitleaksignore is not trusted by this gate. Manage reviewed exceptions in protected CI policy."
+        exit 2
+      fi
+      policy_dir=$(mktemp -d /tmp/gitleaks-policy.XXXXXX)
+      case "$policy_dir" in /tmp/gitleaks-policy.*) ;; *) echo "Could not create isolated Gitleaks policy directory."; exit 2 ;; esac
+      trap 'rm -rf -- "$policy_dir"' EXIT
+      printf '[extend]\nuseDefault = true\n' > "$policy_dir/gitleaks.toml"
+      : > "$policy_dir/.gitleaksignore"
+      set +e
+      gitleaks detect --source . --log-opts=--all --no-banner --redact \
+        --config "$policy_dir/gitleaks.toml" --gitleaks-ignore-path "$policy_dir/.gitleaksignore" \
+        --ignore-gitleaks-allow > "$policy_dir/scanner-output.txt" 2>&1
+      result=$?
+      rm -f -- "$policy_dir/scanner-output.txt"
+      if [ "$result" -eq 0 ]; then echo "Gitleaks completed without findings."; else echo "Gitleaks found a blocking secret or could not complete; raw output was suppressed."; fi
+      exit "$result"
+
+npm-audit:
+  extends: .node
+  stage: security
+  before_script:
+    - npm ci --ignore-scripts --registry=https://registry.npmjs.org/
+  script:
+    - |
+      set +e
+      npm audit --audit-level=high --registry=https://registry.npmjs.org/ > "$CI_PROJECT_DIR/npm-audit-output.txt" 2>&1
+      result=$?
+      rm -f -- "$CI_PROJECT_DIR/npm-audit-output.txt"
+      if [ "$result" -eq 0 ]; then echo "npm audit completed without blocking findings."; else echo "npm audit found blocking findings or could not complete; raw output was suppressed."; fi
+      exit "$result"
+
+osv-scan:
+  stage: security
+  image:
+    name: ghcr.io/google/osv-scanner:v2.7.0@sha256:4f3b7e2c64b9d38a5febc5a7e4a3dfef1d1362f726dea7a2ef4762b46469fcd0
+    entrypoint: [""]
+  script:
+    # OSV queries package identities and versions over the network. Keep the JSON private and
+    # suppress it from logs because scanner output may reveal sensitive project details.
+    - |
+      set +e
+      osv-scanner scan source --recursive --no-ignore --config=/dev/null --format json --verbosity error . > "$CI_PROJECT_DIR/osv-results.json" 2>&1
+      result=$?
+      rm -f -- "$CI_PROJECT_DIR/osv-results.json"
+      if [ "$result" -eq 0 ]; then echo "OSV-Scanner completed without blocking findings."; else echo "OSV-Scanner found vulnerabilities or could not complete; raw output was suppressed."; fi
+      exit "$result"
+
+sast:
+  stage: security
+  image:
+    name: returntocorp/semgrep:1.181.0@sha256:81474464c1f07483ba0682a44787fd93c91397419762a04abe2bafaae396304b
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      git fetch --quiet --no-tags origin "refs/heads/${CI_DEFAULT_BRANCH}:refs/remotes/origin/${CI_DEFAULT_BRANCH}"
+      trusted_commit=$(git rev-parse "refs/remotes/origin/${CI_DEFAULT_BRANCH}")
+      policy_dir=$(mktemp -d /tmp/semgrep-policy.XXXXXX)
+      case "$policy_dir" in /tmp/semgrep-policy.*) ;; *) echo "Could not create isolated Semgrep policy directory."; exit 2 ;; esac
+      trap 'rm -rf -- "$policy_dir"' EXIT
+      git show "$trusted_commit:security-auditor/catalog/tools/semgrep-rules.yaml" > "$policy_dir/semgrep-rules.yaml"
+      if find . -type d -name .git -prune -o -name .semgrepignore -print -quit | grep -q .; then
+        echo "Repository-controlled .semgrepignore files are not trusted by this gate. Review them in protected scanner policy."
+        exit 2
+      fi
+      git remote remove origin
+      unset CI_JOB_TOKEN CI_REPOSITORY_URL CI_REGISTRY_PASSWORD CI_DEPLOY_PASSWORD
+      set +e
+      semgrep scan --config "$policy_dir/semgrep-rules.yaml" --no-git-ignore --error --severity ERROR --metrics off --quiet . > "$policy_dir/semgrep-output.txt" 2>&1
+      result=$?
+      rm -f -- "$policy_dir/semgrep-output.txt"
+      if [ "$result" -eq 0 ]; then echo "Semgrep completed without blocking findings."; elif [ "$result" -eq 1 ]; then echo "Semgrep reported blocking findings; raw output was suppressed."; else echo "Semgrep could not complete; raw output was suppressed."; fi
+      exit "$result"
+
+iac-and-container-scan:
+  stage: security
+  image:
+    name: aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      policy_dir=$(mktemp -d /tmp/trivy-policy.XXXXXX)
+      case "$policy_dir" in /tmp/trivy-policy.*) ;; *) echo "Could not create isolated Trivy policy directory."; exit 2 ;; esac
+      trap 'rm -rf -- "$policy_dir"' EXIT
+      printf '{}\n' > "$policy_dir/trivy.yaml"
+      : > "$policy_dir/trivyignore"
+      if find . -type d \( -name .git -o -name node_modules -o -name vendor -o -name .venv -o -name dist -o -name build \) -prune -o -type f \( -name 'Dockerfile*' -o -name 'docker-compose*.yml' -o -name 'docker-compose*.yaml' -o -name '*.tf' -o -name '*.tf.json' -o -name '*.yaml' -o -name '*.yml' \) -print -quit | grep -q .; then
+        trivy --config "$policy_dir/trivy.yaml" config --ignorefile "$policy_dir/trivyignore" --exit-code 1 --severity CRITICAL,HIGH --format json --output "$policy_dir/trivy-config-results.json" . > /dev/null 2>&1
+      else
+        echo "No applicable IaC or container configuration found; scan not applicable."
+      fi
+      if find . -type f \( -name '*lock*' -o -name 'go.sum' -o -name 'Cargo.toml' -o -name 'pom.xml' -o -name 'build.gradle*' \) -not -path './.git/*' -not -path '*/node_modules/*' -print -quit | grep -q .; then
+        trivy --config "$policy_dir/trivy.yaml" fs --ignorefile "$policy_dir/trivyignore" --scanners vuln,misconfig --exit-code 1 --severity CRITICAL,HIGH --format json --output "$policy_dir/trivy-fs-results.json" . > /dev/null 2>&1
+      fi
+
+security-regression-tests:
+  extends: .node
+  stage: security
+  script:
+    # Adapt to the project's real regression suite. Missing tests must fail rather than be skipped.
+    - npm test -- tests/security
+
+baseline-comparison:
+  stage: security
+  image:
+    name: python:3.12.12-alpine3.22@sha256:848ba4413eb897e225159b8fc1b02094576cbae4aa73fc13142608ae2c8c0e32
+  before_script:
+    - apk add --no-cache git
+  script:
+    - |
+      set -eu
+      trusted_dir=$(mktemp -d /tmp/security-gate.XXXXXX)
+      case "$trusted_dir" in /tmp/security-gate.*) ;; *) echo "Could not create isolated trusted-policy directory."; exit 2 ;; esac
+      trap 'rm -rf -- "$trusted_dir"' EXIT
+      git fetch --quiet --no-tags origin "refs/heads/${CI_DEFAULT_BRANCH}"
+      trusted_commit=$(git rev-parse FETCH_HEAD)
+      mkdir -p "$trusted_dir/trusted-tool/scripts" "$trusted_dir/trusted-tool/schemas/state"
+      git show "$trusted_commit:.security/baseline.json" > "$trusted_dir/trusted-baseline.json"
+      git show "$trusted_commit:.security/risk-register.json" > "$trusted_dir/trusted-risk-register.json"
+      git show "$trusted_commit:security-auditor/scripts/security_auditor.py" > "$trusted_dir/trusted-tool/scripts/security_auditor.py"
+      for schema in findings baseline risk-register controls architecture last-audit; do
+        git show "$trusted_commit:security-auditor/schemas/state/${schema}.schema.json" > "$trusted_dir/trusted-tool/schemas/state/${schema}.schema.json"
+      done
+      for script in encyclopedia build_encyclopedia; do
+        git show "$trusted_commit:security-auditor/scripts/${script}.py" > "$trusted_dir/trusted-tool/scripts/${script}.py"
+      done
+      git show "$trusted_commit:security-auditor/schemas/encyclopedia-coverage.schema.json" > "$trusted_dir/trusted-tool/schemas/encyclopedia-coverage.schema.json"
+      mkdir -p "$trusted_dir/trusted-tool/catalog" "$trusted_dir/trusted-tool/references"
+      git show "$trusted_commit:security-auditor/catalog/encyclopedia.json" > "$trusted_dir/trusted-tool/catalog/encyclopedia.json"
+      git show "$trusted_commit:security-auditor/references/encyclopedia-v1.0.md" > "$trusted_dir/trusted-tool/references/encyclopedia-v1.0.md"
+      git remote remove origin
+      unset CI_JOB_TOKEN CI_REPOSITORY_URL CI_REGISTRY_PASSWORD CI_DEPLOY_PASSWORD
+      python3 "$trusted_dir/trusted-tool/scripts/security_auditor.py" gate --root . \
+        --trusted-baseline "$trusted_dir/trusted-baseline.json" \
+        --trusted-risk-register "$trusted_dir/trusted-risk-register.json"
+
+security-gate:
+  stage: gate
+  image:
+    name: python:3.12.12-alpine3.22@sha256:848ba4413eb897e225159b8fc1b02094576cbae4aa73fc13142608ae2c8c0e32
+  needs:
+    - job: build-and-test
+      artifacts: false
+    - job: secret-scan
+      artifacts: false
+    - job: npm-audit
+      artifacts: false
+    - job: osv-scan
+      artifacts: false
+    - job: sast
+      artifacts: false
+    - job: iac-and-container-scan
+      artifacts: false
+    - job: security-regression-tests
+      artifacts: false
+    - job: baseline-comparison
+      artifacts: false
+  script:
+    - echo "Every required job succeeded; the security gate passed."

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lucianumm/Security/blob/main/security-auditor/schemas/state/last-audit.schema.json",
+  "title": "Security Auditor latest run summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "project", "mode", "startedAt", "finishedAt", "sourceDigest", "scope", "scanners", "score", "coverage", "readiness", "counts", "gate"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "project": {"type": "string", "minLength": 1, "maxLength": 200},
+    "mode": {"enum": ["AUDIT", "AUDIT_AND_FIX", "HARDEN", "VERIFY", "CI_GATE", "TARGETED_AUDIT", "INCIDENT_REVIEW", "NOT_RUN"]},
+    "startedAt": {"type": ["string", "null"], "format": "date-time"},
+    "finishedAt": {"type": ["string", "null"], "format": "date-time"},
+    "sourceDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "scanners": {"type": "array", "items": {"type": "object", "required": ["tool", "version", "ran"], "properties": {"tool": {"type": "string"}, "version": {"type": ["string", "null"]}, "ran": {"type": "boolean"}, "exitCode": {"type": ["integer", "null"]}, "reason": {"type": "string"}}}},
+    "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+    "coverage": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "readiness": {"enum": ["READY_FOR_PRODUCTION", "READY_WITH_RESTRICTIONS", "NOT_READY_FOR_PRODUCTION", "INSUFFICIENT_EVIDENCE"]},
+    "counts": {"type": ["object", "null"]},
+    "gate": {"type": "object", "additionalProperties": false, "required": ["result", "reasons"], "properties": {"result": {"enum": ["PASS", "FAIL", "ERROR", "NOT_RUN"]}, "reasons": {"type": "array", "items": {"type": "string", "maxLength": 1000}}}}
+  }
+}

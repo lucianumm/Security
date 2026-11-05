@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Relatar vulnerabilidade da skill em privado
+    url: https://github.com/lucianumm/Security/security/advisories/new
+    about: Use este canal para falhas da própria skill. Não publique segredos nem falhas de terceiros.
+  - name: Guia de uso e suporte
+    url: https://github.com/lucianumm/Security/blob/main/SUPPORT.md
+    about: Confira os canais, exemplos e informações necessárias antes de abrir um pedido.

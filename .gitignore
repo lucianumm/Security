@@ -1,0 +1,17 @@
+# Local Python/test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated audit output (templates remain tracked under security-auditor/templates/)
+.security/
+/security/
+
+# Local environment and scanner output
+.env
+.env.*
+!.env.example
+*.sarif
+*.scanner-report.json

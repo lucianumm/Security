@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-10-17",
+  "standards": [
+    {
+      "id": "OWASP-ASVS",
+      "edition": "v5.0.0",
+      "status": "latest-stable-verified",
+      "url": "https://github.com/OWASP/ASVS/releases/tag/v5.0.0",
+      "artifact": "OWASP_Application_Security_Verification_Standard_5.0.0_en.json",
+      "sha256": "bcdbec214d70abcfad9284a31d4f9e5134305831d628aad3aa85d7e26626cb35"
+    },
+    {
+      "id": "OWASP-Top-10",
+      "edition": "2025",
+      "status": "current-released-edition-verified",
+      "url": "https://top10.owasp.org/2025/0x00_2025-Introduction/"
+    },
+    {
+      "id": "OWASP-API-Security-Top-10",
+      "edition": "2023",
+      "status": "edition-used-by-this-mapping",
+      "url": "https://api-security.owasp.org/editions/2023/en/0x00-header/"
+    },
+    {
+      "id": "OWASP-GenAI-LLM-Top-10",
+      "edition": "2026",
+      "status": "current-edition-verified",
+      "url": "https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/"
+    },
+    {
+      "id": "OWASP-Agentic-Top-10",
+      "edition": "2026",
+      "status": "edition-verified",
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
+    }
+  ],
+  "citationPolicy": "Include the edition in every category reference. Verify exact requirement IDs against the official source before citing. Never map a legacy identifier to a newer edition without checking the source."
+}

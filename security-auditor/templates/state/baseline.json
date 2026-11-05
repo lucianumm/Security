@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "project": "<configure project>",
+  "scope": {"included": ["."], "excluded": []},
+  "controls": [],
+  "blockingPolicy": {
+    "failPipelineOn": ["ACTIVE_SECRET", "AUTHORIZATION", "RCE", "SQLI", "SECURITY_REGRESSION"],
+    "blockProductionOnHigh": true,
+    "blockOnIncomplete": true,
+    "requireEncyclopediaCoverage": true,
+    "allowMitigated": false,
+    "minimumCoverage": 0.8,
+    "maxFindingAgeDays": 30,
+    "requiredTools": [
+      {"tool": "gitleaks", "successExitCodes": [0]},
+      {"tool": "npm-audit", "successExitCodes": [0]},
+      {"tool": "osv-scanner", "successExitCodes": [0]},
+      {"tool": "semgrep", "successExitCodes": [0]}
+    ]
+  }
+}

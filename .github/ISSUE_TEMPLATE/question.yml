@@ -1,0 +1,24 @@
+name: Tirar uma dúvida de uso
+description: Instalação, modos de operação, relatórios ou interpretação dos resultados.
+title: '[Dúvida] '
+labels: [question]
+body:
+  - type: textarea
+    id: duvida
+    attributes:
+      label: Qual é a dúvida?
+      description: Descreva o objetivo e o ponto em que precisa de orientação.
+    validations:
+      required: true
+  - type: textarea
+    id: tentativa
+    attributes:
+      label: O que você já consultou ou tentou?
+      description: Informe a seção do README, o modo e o comando, quando aplicável.
+    validations:
+      required: true
+  - type: textarea
+    id: ambiente
+    attributes:
+      label: Contexto do ambiente
+      description: Informe apenas dados técnicos necessários e sanitizados; não envie código privado nem segredos.

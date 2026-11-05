@@ -1,0 +1,34 @@
+name: Revisar catálogo ou falso positivo
+description: Corrigir um controle, cenário, mapeamento ou regra de validação.
+title: '[Catálogo] '
+labels: [documentation]
+body:
+  - type: input
+    id: identificador
+    attributes:
+      label: ID ou referência afetada
+      description: Indique o controle, cenário, módulo ou arquivo. Para uma entrada nova, descreva a família.
+      placeholder: APP-02, ENC-D03-S001 ou caminho do módulo
+    validations:
+      required: true
+  - type: textarea
+    id: problema
+    attributes:
+      label: O que precisa ser corrigido?
+      description: Diferencie erro factual, lacuna de cobertura, duplicação e falso positivo.
+    validations:
+      required: true
+  - type: textarea
+    id: fonte
+    attributes:
+      label: Fonte primária e edição
+      description: Informe links oficiais, edição e data consultada, sem inventar IDs normativos.
+    validations:
+      required: true
+  - type: textarea
+    id: validacao
+    attributes:
+      label: Validação defensiva proposta
+      description: Use dados sintéticos e descreva precondições, controle existente e contraprovas. Não teste sistemas de terceiros.
+    validations:
+      required: true

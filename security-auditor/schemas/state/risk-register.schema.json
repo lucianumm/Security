@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lucianumm/Security/blob/main/security-auditor/schemas/state/risk-register.schema.json",
+  "title": "Security Auditor risk exceptions",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "risks"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "risks": {"type": "array", "uniqueItems": true, "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "finding", "decision", "acceptedBy", "acceptedAt", "reviewAt", "approvalRef", "rationale", "compensatingControls"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^RISK-[0-9]{3,8}$"},
+        "finding": {"type": "string", "pattern": "^SEC-[0-9]{4,8}$"},
+        "decision": {"enum": ["ACCEPTED_RISK", "EXTERNAL_ACTION_REQUIRED"]},
+        "acceptedBy": {"type": "string", "maxLength": 200},
+        "acceptedAt": {"type": ["string", "null"], "format": "date-time"},
+        "reviewAt": {"type": ["string", "null"], "format": "date-time"},
+        "approvalRef": {"type": ["string", "null"], "maxLength": 1000},
+        "rationale": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "compensatingControls": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1, "maxLength": 1000}}
+      }
+    }}
+  }
+}
