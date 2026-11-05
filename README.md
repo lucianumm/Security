@@ -37,6 +37,27 @@ Incident Readiness Reviewer.
 
 **Somente defensiva.** Audita e endurece sistemas que você possui ou está autorizado a avaliar.
 
+### Versão 1.2 — enciclopédia e autorização de mudanças
+
+A skill agora inclui a enciclopédia fornecida, um catálogo rastreável de **136 controles e 507
+cenários em 19 domínios**, descoberta local de projetos e uma matriz de cobertura validável. O
+documento declara 506 cenários, mas suas tabelas contêm 507; todas as entradas foram preservadas.
+Cada controle e cenário recebe análise de aplicabilidade e evidências do projeto. O catálogo é
+uma base de revisão pelo agente, não 507 detectores automáticos.
+
+O fluxo passa a ser **analisar → apresentar plano e diff → obter sua autorização → implementar o
+lote aprovado → testar e revalidar**. Isso vale também para cookies, headers, dependências, testes,
+CI e controles novos. O rótulo `SAFE_AUTO_FIX` não autoriza mudanças. A checagem prévia vincula
+plano, patch e autorização ao código revisado; ela não substitui sua confirmação na conversa.
+
+Peça, por exemplo: “Use a security-auditor para analisar todo o projeto com base na enciclopédia,
+identificar vulnerabilidades e controles necessários e apresentar correções para minha aprovação.
+Não altere código antes da minha autorização.” A skill prepara as propostas e só implementa o
+escopo aprovado. Nenhuma skill pode garantir descobrir todas as falhas ou tornar um projeto 100%
+seguro. Controles externos continuam pendentes até haver evidência.
+
+Detalhes e comandos: [`ENCYCLOPEDIA_WORKFLOW.md`](security-auditor/core/ENCYCLOPEDIA_WORKFLOW.md).
+
 ### O ciclo
 
 ```text
@@ -61,8 +82,8 @@ Estados de controle: `IMPLEMENTED` · `PARTIALLY_IMPLEMENTED` · `NOT_IMPLEMENTE
 | Modo | Altera código? | Para quê |
 | --- | --- | --- |
 | `AUDIT` *(padrão)* | Não | Diagnóstico completo, somente leitura |
-| `AUDIT_AND_FIX` | Sim | Audita, corrige com segurança, testa, re-escaneia, verifica |
-| `HARDEN` | Sim | Correção + implementação dos controles de hardening ausentes |
+| `AUDIT_AND_FIX` | Após aprovação do lote | Audita, apresenta plano/diff, obtém autorização, corrige e verifica |
+| `HARDEN` | Após aprovação do lote | Correção + implementação dos controles necessários aprovados |
 | `VERIFY` | Não | Reauditoria, revalidação de findings, detecção de regressões |
 | `CI_GATE` | Não | Checagens de pipeline → `PASS`/`FAIL` + JSON machine-readable |
 | `TARGETED_AUDIT <área>` | Conforme pedido | Uma área só (auth, API, Docker, uploads, CI/CD…) |
@@ -70,13 +91,14 @@ Estados de controle: `IMPLEMENTED` · `PARTIALLY_IMPLEMENTED` · `NOT_IMPLEMENTE
 
 ### O que é auditado
 
-24 módulos carregados sob demanda conforme a stack detectada:
+25 módulos carregados sob demanda conforme a stack detectada:
 
 autenticação · autorização · sessões · API (REST, GraphQL, WebSocket) · frontend · backend ·
 banco de dados e cache · uploads e storage · criptografia · secrets · supply chain · Docker ·
 Kubernetes · cloud/IaC/VPS/DNS · reverse proxy · CI/CD e Git · logging · monitoramento ·
 backup e restore · lógica de negócio · pagamentos · webhooks · segurança de IA/LLM ·
-prontidão para resposta a incidentes.
+prontidão para resposta a incidentes · superfícies mobile/desktop, memória, firmware/OT,
+comunicação, redes sem fio e processos físicos/humanos quando aplicáveis.
 
 ### Instalação (Claude Code / Claude Desktop)
 
@@ -126,6 +148,10 @@ security/     SECURITY_AUDIT.md · SECURITY_MATRIX.md · FINDINGS.md · ATTACK_S
 .security/    baseline.json · findings.json · controls.json · architecture.json ·
               risk-register.json · last-audit.json
 ```
+
+Auditorias completas também mantêm `.security/encyclopedia-coverage.json`; a nova baseline exige
+essa cobertura completa no gate. Políticas antigas v2 continuam compatíveis e podem ativar a
+exigência por atualização revisada.
 
 Nos modos de correção, também: as mudanças de código, os testes de regressão e o `git diff` para
 revisão. Por padrão, a skill deixa o histórico Git intacto; só cria commit, envia ou reescreve o
@@ -182,6 +208,19 @@ Incident Readiness Reviewer.
 
 **Defensive only.** It audits and hardens systems you own or are authorized to assess.
 
+### Version 1.2 — encyclopedia and approved changes
+
+The bundled reference now supplies **136 controls and 507 scenario rows across 19 domains**, with
+source-line traceability, bounded local discovery and a validated coverage ledger. The source says
+506 scenarios; all 507 actual rows are preserved. These are agent review seeds, not 507 automatic
+detectors. Every fix and new control requires a concrete plan/diff and explicit batch approval,
+including changes labeled `SAFE_AUTO_FIX`. A source/plan/patch-bound preflight checks consistency;
+actual user consent and protected approval storage remain host/operator responsibilities.
+
+The new baseline enables `requireEncyclopediaCoverage`; older v2 policies remain compatible and
+may opt in through reviewed updates. No skill can guarantee finding every flaw or 100% security.
+See [`ENCYCLOPEDIA_WORKFLOW.md`](security-auditor/core/ENCYCLOPEDIA_WORKFLOW.md).
+
 ### The cycle
 
 ```text
@@ -206,8 +245,8 @@ Control states: `IMPLEMENTED` · `PARTIALLY_IMPLEMENTED` · `NOT_IMPLEMENTED` ·
 | Mode | Writes code? | Use it for |
 | --- | --- | --- |
 | `AUDIT` *(default)* | No | Full read-only diagnosis |
-| `AUDIT_AND_FIX` | Yes | Audit, fix safely, test, re-scan, verify |
-| `HARDEN` | Yes | Fix plus implement missing hardening controls |
+| `AUDIT_AND_FIX` | After batch approval | Audit, present plan/diff, obtain approval, fix and verify |
+| `HARDEN` | After batch approval | Approved fixes plus justified missing hardening controls |
 | `VERIFY` | No | Re-audit, revalidate findings, detect regressions |
 | `CI_GATE` | No | Pipeline checks → `PASS`/`FAIL` + machine-readable JSON |
 | `TARGETED_AUDIT <area>` | Per request | One area (auth, API, Docker, uploads, CI/CD…) |
@@ -215,13 +254,14 @@ Control states: `IMPLEMENTED` · `PARTIALLY_IMPLEMENTED` · `NOT_IMPLEMENTED` ·
 
 ### What gets audited
 
-24 modules, loaded on demand according to the detected stack:
+25 modules, loaded on demand according to the detected stack:
 
 authentication · authorization · sessions · API (REST, GraphQL, WebSocket) · frontend · backend ·
 database and cache · uploads and storage · cryptography · secrets · supply chain · Docker ·
 Kubernetes · cloud/IaC/VPS/DNS · reverse proxy · CI/CD and Git · logging · monitoring ·
 backup and restore · business logic · payments · webhooks · AI/LLM security ·
-incident response readiness.
+incident response readiness · extended mobile/desktop, firmware/OT, memory, communication,
+wireless and physical/process surfaces when applicable.
 
 ### Installation (Claude Code / Claude Desktop)
 
@@ -306,7 +346,7 @@ security-auditor/
 ├── README.md · VERSION
 ├── core/                 SAFETY · WORKFLOW · EVIDENCE_RULES · SEVERITY · SCORING ·
 │                         REMEDIATION_POLICY
-├── modules/              24 módulos técnicos / 24 technical modules
+├── modules/              25 módulos técnicos / 25 technical modules
 ├── references/           OWASP · ASVS · CWE · CHECKLIST_GLOBAL · CHECKLIST_PRODUCTION
 ├── templates/            10 templates de relatório + state/ (JSON) + ci/ (pipelines)
 └── scripts/              detect-stack.sh · security-gate.sh

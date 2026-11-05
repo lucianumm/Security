@@ -24,6 +24,8 @@ jobs:
         run: python3 --version
       - name: Run gate and schema regression tests
         run: python3 -m unittest discover -s security-auditor/tests/unit -v
+      - name: Verify encyclopedia source and catalog integrity
+        run: python3 security-auditor/scripts/build_encyclopedia.py
       - name: Check POSIX scripts parse
         run: |
           sh -n security-auditor/scripts/security-gate.sh

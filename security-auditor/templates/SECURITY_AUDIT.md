@@ -47,6 +47,18 @@ Immediate Actions
 | Not verified | <controls left as NOT_VERIFIED and why> |
 | Assumptions | <keep this list as short as possible; each one is a risk> |
 
+### Encyclopedia coverage and approval status
+
+Catalog: <source version/hash> · Source digest: <digest>
+Controls reviewed: <n>/136 · Applicable / excluded / unknown: <n>/<n>/<n>
+Scenarios reviewed: <n>/507 · Domains accounted for: <n>/19
+Source count discrepancy: the original declares 506 scenarios; 507 actual rows are preserved.
+
+List evidence-backed exclusions, unresolved domains, current intelligence sources/dates and the
+external verification backlog. Record proposed, approved, applied and verified actions separately,
+with plan digest and user-message approval references. Catalog accounting is not a claim that all
+vulnerabilities were found. Do not mark the project fully secure because the ledger is complete.
+
 ## 2. System overview
 
 **Stack detected:** <languages, frameworks, datastores, infra, CI, cloud>

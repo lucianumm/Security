@@ -8,6 +8,19 @@ should read as "improve security".
 
 Date: <YYYY-MM-DD> · Findings covered: <n> · Mode of the audit: <mode>
 
+## Approval batch
+
+Source digest: <current digest> · Catalog digest: <catalog digest>
+Plan digest: <reviewed plan digest> · Patch SHA-256: <actual patch bytes>
+Action IDs: <PLAN-XXXX> · Approval: <PENDING | APPROVED | REJECTED | REVOKED>
+User-message reference: <real approval reference, only after explicit approval>
+Validity / scope: <approved session window, exact worktree and paths>
+
+Map each action to finding/control/scenario IDs, actual diff, compatibility risks, regression tests
+and rollback. Include new hardening controls and external actions with their owners. Prepare plan,
+patch and receipt outside the target. Do not apply anything while approval is PENDING, including
+`SAFE_AUTO_FIX`. See `../core/ENCYCLOPEDIA_WORKFLOW.md` and the plan/approval schemas.
+
 ---
 
 ## 1. Immediate — P0 (start now)

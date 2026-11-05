@@ -17,6 +17,10 @@ as `NOT_VERIFIED` and must be revalidated before it may be reported as `FIXED` o
 
 ## Phase 1 — Stack discovery
 
+For full audits, follow `ENCYCLOPEDIA_WORKFLOW.md`: create the source-bound review ledger, account
+for all 136 controls and 507 imported scenarios and load only relevant detailed sections. The
+profile helper supplies routing hints, not an audit result or approval to install controls.
+
 See `../SKILL.md` §4. Exit criterion: languages, frameworks, package managers, datastores, infra,
 CI, cloud and integrations identified from files (not from the README), and the module set selected
 and recorded.
@@ -158,7 +162,9 @@ Apply `SEVERITY.md`. Produce the ordered remediation list (`security/REMEDIATION
 
 ## Phase 11 — Remediation (fix modes only)
 
-Apply `REMEDIATION_POLICY.md`. One logical fix at a time; keep the working tree coherent.
+Apply `REMEDIATION_POLICY.md` and `ENCYCLOPEDIA_WORKFLOW.md` §3–4. Prepare the concrete plan/diff
+outside the target, obtain explicit batch approval and check its current source/patch binding
+before changing the target. Implement only the approved changes and keep the tree coherent.
 
 ## Phase 12 — Regression tests
 
@@ -189,7 +195,7 @@ the expected state of each control so a future run can detect drift.
 
 ## Phase 17 — CI security gate
 
-Propose (or implement, in `HARDEN`) the pipeline in `../modules/ci-cd.md` §Security gate using
+Propose (or implement after explicit batch approval in `HARDEN`) the pipeline in `../modules/ci-cd.md` §Security gate using
 `../templates/ci/`. Respect the project's existing CI platform.
 
 ## Phase 18 — Final report

@@ -107,7 +107,8 @@ widely-audited actions (`ci-cd.md`).
 ## 8. Update policy to recommend
 
 - Automated dependency updates (Dependabot/Renovate) with grouped, tested PRs.
-- Patch updates: auto-merge when CI is green (`SAFE_AUTO_FIX`).
+- Patch updates: propose the advisory-specific patch and lockfile change (`SAFE_AUTO_FIX` risk
+  label); apply only after batch approval. Green CI does not authorize merging or publication.
 - Minor updates: reviewed (`REVIEW_RECOMMENDED`).
 - Major updates: planned work with a changelog review (`MANUAL_ACTION`).
 - A defined SLA for critical advisories (e.g. patch or mitigate within 72 h).

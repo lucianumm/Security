@@ -1,5 +1,13 @@
 # Attack scenario catalog
 
+The complete imported inventory is [`../encyclopedia.json`](../encyclopedia.json): 507 scenario
+rows across 19 domains plus 136 controls, with exact source-line pointers. The original source
+declares 506 scenarios; the catalog records the discrepancy and preserves all rows. These entries
+are coverage seeds, not implemented detectors or confirmed findings. Follow
+[`../../core/ENCYCLOPEDIA_WORKFLOW.md`](../../core/ENCYCLOPEDIA_WORKFLOW.md) for applicability,
+evidence, coverage validation and user-approved implementation. The AS-* families below remain
+useful cross-cutting reasoning prompts; do not double-count them as additional verified checks.
+
 Use these prompts as coverage seeds, then tailor them to the discovered architecture. They are
 questions for defensive review, not claims that the project is vulnerable. Link every applicable
 scenario to code/configuration and counterevidence. Add a project-specific scenario when an asset or

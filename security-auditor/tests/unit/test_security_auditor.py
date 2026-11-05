@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
-import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,11 +13,8 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "security_auditor.py"
-SPEC = importlib.util.spec_from_file_location("security_auditor", SCRIPT)
-assert SPEC and SPEC.loader
-auditor = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = auditor
-SPEC.loader.exec_module(auditor)
+sys.path.insert(0, str(SCRIPT.parent))
+import security_auditor as auditor
 
 
 class GateFixture(unittest.TestCase):
@@ -107,6 +104,66 @@ class GateFixture(unittest.TestCase):
 
 
 class SecurityAuditorGateTests(GateFixture):
+    def encyclopedia_ledger(self):
+        import encyclopedia as enc
+        ledger = enc.profile(self.root, enc.catalog())
+        for control in ledger["controls"]:
+            control.update(status="NOT_APPLICABLE", applicability="NOT_APPLICABLE", reason="Synthetic fixture scope", evidence=["fixture:review"])
+        ledger["controls"][0].update(status="IMPLEMENTED", applicability="APPLICABLE")
+        for scenario in ledger["scenarios"]:
+            scenario.update(status="NOT_APPLICABLE", reason="Synthetic fixture scope", evidence=["fixture:review"])
+        ledger["complete"] = True
+        return ledger
+
+    def enable_encyclopedia_policy(self, ledger):
+        self.baseline["blockingPolicy"]["requireEncyclopediaCoverage"] = True
+        self.baseline["controls"] = [{"id": "GOV-01", "expected": "IMPLEMENTED"}]
+        self.findings["controls"] = [{"id": c["id"], "status": c["status"], "evidence": c["evidence"]} for c in ledger["controls"]]
+        (self.root / ".security" / "encyclopedia-coverage.json").write_text(json.dumps(ledger), encoding="utf-8")
+
+    def test_encyclopedia_gate_accepts_matching_complete_ledger(self):
+        self.enable_encyclopedia_policy(self.encyclopedia_ledger())
+        self.assertEqual(self.evaluate()["result"], "PASS")
+
+    def test_encyclopedia_gate_runs_from_an_isolated_trusted_bundle(self):
+        self.enable_encyclopedia_policy(self.encyclopedia_ledger())
+        self.assertEqual(self.evaluate()["result"], "PASS")
+        skill = SCRIPT.parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "trusted-tool"
+            for name in ["scripts", "schemas"]:
+                shutil.copytree(skill / name, bundle / name, ignore=shutil.ignore_patterns("__pycache__"))
+            for relative in ["catalog/encyclopedia.json", "references/encyclopedia-v1.0.md"]:
+                destination = bundle / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(skill / relative, destination)
+            result = subprocess.run([sys.executable, str(bundle / "scripts" / "security_auditor.py"), "gate", "--root", str(self.root)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(json.loads(result.stdout)["result"], "PASS")
+
+    def test_encyclopedia_gate_blocks_missing_incomplete_and_forged_complete_ledger(self):
+        self.baseline["blockingPolicy"]["requireEncyclopediaCoverage"] = True
+        with self.assertRaises(auditor.GateError):
+            self.evaluate()
+        ledger = self.encyclopedia_ledger()
+        for complete in [False, True]:
+            ledger["complete"] = complete
+            ledger["scenarios"][0]["status"] = "NOT_VERIFIED"
+            self.enable_encyclopedia_policy(ledger)
+            with self.assertRaises(auditor.GateError):
+                self.evaluate()
+
+    def test_encyclopedia_gate_blocks_ledger_state_and_coverage_count_mismatch(self):
+        for mutate in [
+            lambda: self.findings["controls"][0].update(status="NOT_APPLICABLE"),
+            lambda: self.findings["controls"][0].update(evidence=[]),
+            lambda: self.findings["coverage"].update(applicableControls=2),
+        ]:
+            self.enable_encyclopedia_policy(self.encyclopedia_ledger())
+            mutate()
+            with self.assertRaises(auditor.GateError):
+                self.evaluate()
+
     def test_complete_current_audit_with_clean_findings_passes(self) -> None:
         self.assertEqual(self.evaluate()["result"], "PASS")
 

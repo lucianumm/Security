@@ -111,7 +111,7 @@ Base remediation order (adjust to the project's reality):
 
 | Type | Definition | Autonomy |
 | --- | --- | --- |
-| `SAFE_AUTO_FIX` | Deterministic, reversible, low blast radius; no behavior change beyond the security effect. | Apply in fix modes |
+| `SAFE_AUTO_FIX` | Deterministic, reversible, low blast radius; no behavior change beyond the security effect. Historical label, not authorization. | Apply only after explicit batch approval |
 | `REVIEW_RECOMMENDED` | May affect behavior, compatibility, UX or performance. | Propose; apply only with the user's agreement |
 | `MANUAL_INFRASTRUCTURE_ACTION` | Requires a change outside the repository (cloud console, DNS, provider settings, server). | Never apply; write exact steps |
 | `SECRET_ROTATION_REQUIRED` | A credential must be revoked/rotated by a human with provider access. | Never apply; write exact steps |

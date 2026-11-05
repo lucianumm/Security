@@ -164,6 +164,13 @@ baseline-comparison:
       for schema in findings baseline risk-register controls architecture last-audit; do
         git show "$trusted_commit:security-auditor/schemas/state/${schema}.schema.json" > "$trusted_dir/trusted-tool/schemas/state/${schema}.schema.json"
       done
+      for script in encyclopedia build_encyclopedia; do
+        git show "$trusted_commit:security-auditor/scripts/${script}.py" > "$trusted_dir/trusted-tool/scripts/${script}.py"
+      done
+      git show "$trusted_commit:security-auditor/schemas/encyclopedia-coverage.schema.json" > "$trusted_dir/trusted-tool/schemas/encyclopedia-coverage.schema.json"
+      mkdir -p "$trusted_dir/trusted-tool/catalog" "$trusted_dir/trusted-tool/references"
+      git show "$trusted_commit:security-auditor/catalog/encyclopedia.json" > "$trusted_dir/trusted-tool/catalog/encyclopedia.json"
+      git show "$trusted_commit:security-auditor/references/encyclopedia-v1.0.md" > "$trusted_dir/trusted-tool/references/encyclopedia-v1.0.md"
       git remote remove origin
       unset CI_JOB_TOKEN CI_REPOSITORY_URL CI_REGISTRY_PASSWORD CI_DEPLOY_PASSWORD
       python3 "$trusted_dir/trusted-tool/scripts/security_auditor.py" gate --root . \

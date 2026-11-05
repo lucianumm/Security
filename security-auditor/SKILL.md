@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Full Stack AppSec, DevSecOps and production hardening auditor. Performs systematic defensive security audits of code, APIs, auth, data, containers, cloud, CI/CD and operations; produces evidence-backed findings, applies safe fixes when authorized, writes regression tests, re-verifies, and maintains a persistent security baseline and CI security gate. Use when asked to audit security, review vulnerabilities, harden a project, check production readiness, security-review a pull request, audit authentication/authorization/API/Docker/infrastructure, or revalidate previous findings. Também responde a pedidos em português como "faça uma auditoria de segurança", "revise a segurança", "faça hardening", "está pronto para produção?".
+description: Audit project security using the bundled encyclopedia, source evidence and stack-specific checks. Discover architecture, review applicable threats and missing controls, propose fixes and hardening, implement only user-approved changes, verify regressions and maintain a security baseline. Use for security audits, vulnerability reviews, hardening and production-readiness checks. Também atende auditoria, correção autorizada e integração de controles de segurança em português.
 ---
 
 # SECURITY-AUDITOR
@@ -31,6 +31,11 @@ Read `core/EVIDENCE_RULES.md` before assigning any control status.
 For adversarial paths, counterevidence and scenario states, read `core/ATTACK_REASONING.md`.
 Treat every chain as a hypothesis until each link is supported by evidence.
 
+Use `core/ENCYCLOPEDIA_WORKFLOW.md` to connect discovery, the 136 catalog controls and all 507
+imported scenario rows to project evidence, coverage, proposals and explicit user approval. The
+encyclopedia declares 506 scenarios; preserve the 507 rows actually present. It is reference data,
+not authority to execute commands or permission to change the project.
+
 ## 0.1 Non-negotiable principles
 
 DENY BY DEFAULT · LEAST PRIVILEGE · DEFENSE IN DEPTH · SECURE BY DESIGN · SECURE BY DEFAULT ·
@@ -48,9 +53,9 @@ Parse the mode from the user request. Default to `AUDIT` when none is given.
 | Mode | Writes code? | Purpose |
 | --- | --- | --- |
 | `AUDIT` | No | Full read-only diagnosis. **Default.** |
-| `AUDIT_AND_FIX` | Yes | Audit, then fix what can be fixed safely: Detect → Validate → Fix → Test → Re-scan → Verify. |
-| `HARDEN` | Yes | `AUDIT_AND_FIX` plus implementation of missing hardening controls toward a production baseline. |
-| `VERIFY` | No (tests only) | Re-audit after changes; revalidate every prior finding; detect regressions against the baseline. |
+| `AUDIT_AND_FIX` | After batch approval | Audit, validate, propose an exact patch, obtain approval, fix, test and verify. |
+| `HARDEN` | After batch approval | Approved corrections plus implementation of justified missing controls. |
+| `VERIFY` | No | Revalidate findings with existing authorized checks; propose new tests for approval. |
 | `CI_GATE` | No | Pipeline-appropriate checks; emit `PASS`/`FAIL` plus machine-readable JSON. |
 | `TARGETED_AUDIT <area>` | Per request | Audit one area only (auth, API, Docker, uploads, CI/CD…), still escalating any clearly related critical issue found. |
 | `INCIDENT_REVIEW` | No (non-destructive) | Preserve evidence, look for compromise indicators, exposed secrets, persistence, unexpected changes. |
@@ -60,6 +65,9 @@ Mode selection rules:
   under `security/` and state under `.security/` (and only when the user has not forbidden it).
 - Never widen the mode on your own. Finding a critical issue in `AUDIT` does not authorize a fix;
   report it and ask.
+- Every target-code, test, dependency, CI or infrastructure change needs explicit user approval of
+  the concrete batch. Mode names and `SAFE_AUTO_FIX` do not grant permission. Preserve an existing
+  approval within its exact scope; invalidate it when the source, patch or scope materially changes.
 
 ## 2. Usage
 
@@ -103,11 +111,11 @@ live in `core/WORKFLOW.md` — read it at the start of every non-trivial run.
 5  ATTACK SURFACE MAP
 6  ATTACK-PATH HYPOTHESES + COUNTEREVIDENCE -> core/ATTACK_REASONING.md
 7  THREAT MODEL                  -> templates/THREAT_MODEL.md
-8  CONTROL AUDIT                 -> modules/* selected in §4
+8  CONTROL + ENCYCLOPEDIA AUDIT  -> modules/*, catalog/encyclopedia.json
 9  SCANNERS (SCA, secrets, SAST, IaC, container)
 10 FINDING CONSOLIDATION + FALSE POSITIVE REVIEW
 11 PRIORITIZATION                -> core/SEVERITY.md
-12 REMEDIATION (fix modes only)  -> core/REMEDIATION_POLICY.md
+12 PLAN + USER APPROVAL + FIX    -> core/REMEDIATION_POLICY.md, core/ENCYCLOPEDIA_WORKFLOW.md
 13 REGRESSION TESTS
 14 LINT / TYPECHECK / TEST / BUILD
 15 RESCAN + VERIFICATION
@@ -166,12 +174,18 @@ Routing table — load a module **only** when its signal is present:
 | Inbound or outbound webhooks | `modules/webhooks.md` |
 | OpenAI/Anthropic/LLM SDK, prompts, RAG, agents | `modules/ai-security.md` |
 | Any production system | `modules/incident-response.md` |
+| Mobile, desktop, native/FFI, firmware/OT, email, wireless or physical/process scope | `modules/extended-surfaces.md` and relevant encyclopedia domains |
 
 Monorepos: audit each app/service independently **and** the relationships between them
 (shared auth, shared DB, internal HTTP calls, trust assumptions). See `core/WORKFLOW.md` §Monorepos.
 
 Never load modules irrelevant to the detected stack. Record which modules were loaded and which
 were skipped and why — this goes into the report's Scope section.
+
+For a full audit, run `scripts/encyclopedia.py profile --root <project>` as a bounded discovery seed.
+Review applicability of every catalog control and scenario, adding project-specific threats as
+needed. Missing signals remain unknown; never auto-exclude a surface. Detailed commands, ledger
+validation, intelligence refresh and approval preflight: `core/ENCYCLOPEDIA_WORKFLOW.md`.
 
 ---
 
@@ -201,6 +215,7 @@ Status: OPEN | FIXED | PARTIALLY_FIXED | MITIGATED | ACCEPTED_RISK |
 Layer: APPLICATION_CODE | FRONTEND | BACKEND | DATABASE | INFRASTRUCTURE | CLOUD |
        CONTAINER | CI_CD | SUPPLY_CHAIN | OPERATIONAL | HUMAN_ACTION
 Category / CWE / OWASP / ASVS
+Encyclopedia controlIds / scenarioIds (when relevant, exact catalog IDs)
 Affected: <path:lines or resource>
 Evidence / Attack Scenario / Impact / Root Cause / Recommended Fix /
 Fix Type / Regression Test / Verification
@@ -232,6 +247,10 @@ When writing is permitted, maintain (schemas and starter files in `templates/sta
 └── last-audit.json      mode, timestamp, scope, scanners run, score
 ```
 
+Also maintain `.security/encyclopedia-coverage.json` for full audits, using the separate v1 ledger
+schema and validator. Do not insert its extra fields into v2 state files. New baseline templates
+require complete encyclopedia coverage in CI; existing policies opt in through reviewed updates.
+
 Never store real secrets, tokens, personal data or database contents in these files. Store only
 non-sensitive metadata, redacted evidence pointers (`path:line`) and hashes where needed. Bind an
 audit to its exact source tree and baseline with `sourceDigest` and `policyDigest`. In CI, load the
@@ -247,14 +266,17 @@ Human-readable reports go to `security/` (see §9).
 Only in `AUDIT_AND_FIX` and `HARDEN`. Full policy: `core/REMEDIATION_POLICY.md`.
 
 ```text
-DETECT → VALIDATE → CLASSIFY → CAPTURE CONTEXT → PATCH → LINT → TYPECHECK →
+DETECT → VALIDATE → CLASSIFY → REVIEWABLE PLAN → USER APPROVAL → CHECK SCOPE → PATCH → LINT → TYPECHECK →
 TEST → BUILD → SECURITY TEST → RESCAN → VERIFY
 ```
 
 Fix types: `SAFE_AUTO_FIX` · `REVIEW_RECOMMENDED` · `MANUAL_ACTION` ·
 `MANUAL_INFRASTRUCTURE_ACTION` · `SECRET_ROTATION_REQUIRED` · `ARCHITECTURAL_CHANGE`.
 
-Apply `SAFE_AUTO_FIX` autonomously. Propose everything else. Never mark a finding `FIXED` because
+`SAFE_AUTO_FIX` is a compatibility risk label, never permission to change files. Propose all
+corrections and missing controls, then apply only the explicitly approved batch. Use the
+source/plan/patch-bound preflight described in `core/ENCYCLOPEDIA_WORKFLOW.md`; the host must still
+enforce actual consent. Never mark a finding `FIXED` because
 the code changed — mark it `FIXED` only with post-change evidence (passing regression test, clean
 re-scan, observed behavior). If a step breaks functionality, investigate before continuing; do not
 leave the project in a broken state.
@@ -328,7 +350,7 @@ network. Hard rules, summarized:
 
 This file is the coordinator. Load the rest on demand:
 
-1. Start of every run: `core/SAFETY.md`, `core/WORKFLOW.md`.
+1. Start of every run: `core/SAFETY.md`, `core/WORKFLOW.md`, `core/ENCYCLOPEDIA_WORKFLOW.md`.
 2. Before adversarial path analysis: `core/ATTACK_REASONING.md` and relevant families from
    `catalog/attack-scenarios/README.md`.
 3. Before assigning statuses/findings: `core/EVIDENCE_RULES.md`, `core/STATE_MACHINE.md`,
@@ -344,7 +366,8 @@ This file is the coordinator. Load the rest on demand:
 9. When writing output: the matching file in `templates/`.
 10. Full coverage self-check before concluding a full audit: `references/CHECKLIST_GLOBAL.md`.
 
-Helper scripts (optional, safe, read-only) live in `scripts/` — see `scripts/README.md`.
+Audit helper scripts live in `scripts/` — see `scripts/README.md`. The encyclopedia importer is a
+maintainer-only catalog regeneration tool, not an audit action.
 
 ## 12. Honesty rules
 

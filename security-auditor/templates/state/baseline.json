@@ -7,6 +7,7 @@
     "failPipelineOn": ["ACTIVE_SECRET", "AUTHORIZATION", "RCE", "SQLI", "SECURITY_REGRESSION"],
     "blockProductionOnHigh": true,
     "blockOnIncomplete": true,
+    "requireEncyclopediaCoverage": true,
     "allowMitigated": false,
     "minimumCoverage": 0.8,
     "maxFindingAgeDays": 30,

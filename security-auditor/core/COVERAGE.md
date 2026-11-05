@@ -3,6 +3,12 @@
 Report coverage with explicit denominators. Do not equate modules loaded, scanners installed, files
 enumerated or lines searched with verified security coverage.
 
+For a full encyclopedia audit, keep the separate `.security/encyclopedia-coverage.json` ledger:
+136 controls and all 507 imported scenarios must be accounted for, including justified exclusions.
+The source's declared count (506) differs from its actual rows (507). Use
+`ENCYCLOPEDIA_WORKFLOW.md` and `scripts/encyclopedia.py validate-coverage`. Completeness measures
+review accounting, not detector coverage, security certification or the absence of vulnerabilities.
+
 Keep separate counts for:
 
 | Measure | Denominator and inclusion rule |

@@ -9,6 +9,14 @@ tests, re-verifies, records a baseline, and establishes a CI security gate.
 
 Defensive only. It audits and hardens systems you own or are authorized to assess.
 
+Version 1.2 adds the original encyclopedia and a reproducible catalog of 136 controls, 507 actual
+scenario rows and 19 domains (the source declares 506). Read
+[`core/ENCYCLOPEDIA_WORKFLOW.md`](core/ENCYCLOPEDIA_WORKFLOW.md) for project discovery, complete
+coverage accounting, scoped proposals and user-approved implementation. All target changes,
+including `SAFE_AUTO_FIX`, need explicit approval of the concrete batch. The helper checks
+source/plan/patch consistency; the host/operator must enforce actual user consent. Catalog entries
+are review guidance, not automatic vulnerability detectors or a guarantee of complete security.
+
 ---
 
 ## Design principles
@@ -36,15 +44,16 @@ security-auditor/
 │   ├── EVIDENCE_RULES.md        status vocabulary, what counts as evidence, false positives
 │   ├── SEVERITY.md              severity, confidence, priority, fix types, finding lifecycle
 │   ├── SCORING.md               0–100 score, hard caps, production readiness verdicts
-│   └── REMEDIATION_POLICY.md    what may be auto-fixed, regression tests, change reporting
+│   └── REMEDIATION_POLICY.md    approved corrections, regression tests, change reporting
+│   ├── ENCYCLOPEDIA_WORKFLOW.md catalog review, coverage, concrete plan and approval checks
 │   ├── ATTACK_REASONING.md      adversary paths, attacker goals, evidence and counterevidence
 │   ├── TOOL_EXECUTION.md        tool selection, privacy, network and execution profiles
 │   ├── COVERAGE.md · STATE_MACHINE.md
-├── modules/                     24 technology/domain modules, loaded on detection
+├── modules/                     25 technology/domain modules, loaded on detection
 │   authentication · authorization · sessions · api · frontend · backend · database ·
 │   uploads · cryptography · secrets · supply-chain · docker · kubernetes · cloud ·
 │   nginx · ci-cd · logging · monitoring · backup · business-logic · payments ·
-│   webhooks · ai-security · incident-response
+│   webhooks · ai-security · incident-response · extended-surfaces
 ├── references/
 │   ├── OWASP_MAPPING.md         Top 10, API Top 10, LLM Top 10, related standards
 │   ├── ASVS_MAPPING.md          chapter → module map, verification levels
@@ -72,8 +81,8 @@ security-auditor/
 | Mode | Writes code? | Use it for |
 | --- | --- | --- |
 | `AUDIT` *(default)* | No | Full read-only diagnosis |
-| `AUDIT_AND_FIX` | Yes | Audit, fix safely, test, re-scan, verify |
-| `HARDEN` | Yes | Fix plus implement missing hardening controls |
+| `AUDIT_AND_FIX` | After batch approval | Audit, present plan/diff, obtain approval, fix and verify |
+| `HARDEN` | After batch approval | Approved fixes plus justified missing hardening controls |
 | `VERIFY` | No | Re-audit, revalidate findings, detect regressions |
 | `CI_GATE` | No | Pipeline checks → `PASS`/`FAIL` + machine-readable JSON |
 | `TARGETED_AUDIT <area>` | Per request | One area (auth, API, Docker, uploads, CI/CD…) |

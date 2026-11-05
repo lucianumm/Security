@@ -259,8 +259,10 @@ jobs:
           sparse-checkout: |
             .security/baseline.json
             .security/risk-register.json
-            security-auditor/scripts/security_auditor.py
-            security-auditor/schemas/state
+            security-auditor/scripts
+            security-auditor/schemas
+            security-auditor/catalog/encyclopedia.json
+            security-auditor/references/encyclopedia-v1.0.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Load trusted policy outside the source tree
@@ -271,9 +273,10 @@ jobs:
           test -s .trusted-policy/.security/risk-register.json
           cp .trusted-policy/.security/baseline.json "$RUNNER_TEMP/trusted-baseline.json"
           cp .trusted-policy/.security/risk-register.json "$RUNNER_TEMP/trusted-risk-register.json"
-          mkdir -p "$RUNNER_TEMP/trusted-tool/scripts" "$RUNNER_TEMP/trusted-tool/schemas"
-          cp .trusted-policy/security-auditor/scripts/security_auditor.py "$RUNNER_TEMP/trusted-tool/scripts/"
-          cp -R .trusted-policy/security-auditor/schemas/state "$RUNNER_TEMP/trusted-tool/schemas/"
+          mkdir -p "$RUNNER_TEMP/trusted-tool/catalog" "$RUNNER_TEMP/trusted-tool/references"
+          cp -R .trusted-policy/security-auditor/scripts .trusted-policy/security-auditor/schemas "$RUNNER_TEMP/trusted-tool/"
+          cp .trusted-policy/security-auditor/catalog/encyclopedia.json "$RUNNER_TEMP/trusted-tool/catalog/"
+          cp .trusted-policy/security-auditor/references/encyclopedia-v1.0.md "$RUNNER_TEMP/trusted-tool/references/"
           rm -rf -- .trusted-policy
           test -s "$RUNNER_TEMP/trusted-tool/scripts/security_auditor.py"
       - name: Evaluate the current report against protected policy

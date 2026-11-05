@@ -16,7 +16,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.1.0"
+sys.dont_write_bytecode = True
+
+VERSION = "1.2.0"
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 FINDING_ID = re.compile(r"^SEC-[0-9]{4,8}$")
 BLOCKING_STATUSES = {"OPEN", "PARTIALLY_FIXED", "REGRESSION", "NOT_VERIFIED", "EXTERNAL_ACTION_REQUIRED"}
@@ -192,7 +194,7 @@ def source_digest(root: Path) -> str:
     """Hash source content; exclude reports/state to avoid a self-referential digest."""
     try:
         listing = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
             check=True, capture_output=True, timeout=30, shell=False,
         ).stdout
     except (OSError, subprocess.SubprocessError):
@@ -337,6 +339,25 @@ def evaluate(
         raise GateError("risk register contains duplicate identities")
     if not findings_doc["source"]["complete"]:
         raise GateError("audit is incomplete; PASS is unavailable")
+    if baseline["blockingPolicy"].get("requireEncyclopediaCoverage", False):
+        from encyclopedia import catalog, checked_json, validate_coverage
+        if baseline["scope"]["included"] != ["."] or baseline["scope"]["excluded"]:
+            raise GateError("full encyclopedia policy cannot silently exclude project scope")
+        coverage_path = root / ".security" / "encyclopedia-coverage.json"
+        # Resolve under the project boundary before using the shared schema loader.
+        read_json(coverage_path, root)
+        ledger = checked_json(coverage_path, "encyclopedia-coverage.schema.json")
+        if validate_coverage(root, ledger, catalog())["result"] != "COMPLETE":
+            raise GateError("encyclopedia coverage is incomplete")
+        observed = {c["id"]: c for c in findings_doc["controls"]}
+        for control in ledger["controls"]:
+            actual = observed.get(control["id"])
+            if actual is None or actual["status"] != control["status"] or set(actual["evidence"]) != set(control["evidence"]):
+                raise GateError("findings and encyclopedia control evidence differ")
+        applicable = sum(c["applicability"] == "APPLICABLE" for c in ledger["controls"])
+        verified = sum(c["applicability"] == "APPLICABLE" and c["status"] != "NOT_VERIFIED" for c in ledger["controls"])
+        if findings_doc["coverage"] != {"applicableControls": applicable, "verifiedControls": verified}:
+            raise GateError("findings coverage counts differ from the encyclopedia ledger")
     minimum = baseline["blockingPolicy"]["minimumCoverage"]
     coverage = findings_doc["coverage"]
     if coverage["verifiedControls"] > coverage["applicableControls"]:
